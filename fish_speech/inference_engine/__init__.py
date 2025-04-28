@@ -163,6 +163,7 @@ class TTSInferenceEngine(ReferenceLoader, VQManager):
             )
         )
         return response_queue
+
     def get_audio_segment(self, result: GenerateResponse) -> np.ndarray:
         """
         Decode the VQ tokens to audio.

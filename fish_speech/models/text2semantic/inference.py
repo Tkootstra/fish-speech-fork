@@ -24,7 +24,8 @@ from fish_speech.conversation import (
     VQPart,
 )
 from fish_speech.models.text2semantic.llama import BaseModelArgs
-from fish_speech.text import clean_text, split_text
+from fish_speech.text.clean import clean_text
+from fish_speech.text.spliter import split_text
 from fish_speech.tokenizer import IM_END_TOKEN, FishTokenizer
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"

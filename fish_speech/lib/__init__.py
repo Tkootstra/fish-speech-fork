@@ -25,7 +25,7 @@ class Pipeline:
         vqgan_path: str,
         vqgan_config: str = "firefly_gan_vq",
         device: Device = "cpu",
-        half: bool = False
+        half: bool = False,
         compile: bool = False,
     ) -> None:
         """

@@ -31,6 +31,8 @@ class TTSInferenceEngine(ReferenceLoader, VQManager):
         self.decoder_model = decoder_model
         self.precision = precision
         self.compile = compile
+
+
     @torch.inference_mode()
     def inference(self, req: ServeTTSRequest) -> Generator[InferenceResult, None, None]:
         """
@@ -99,7 +101,6 @@ class TTSInferenceEngine(ReferenceLoader, VQManager):
                 segment = self.get_audio_segment(result)
 
                 if req.streaming:  # Used only by the API server
-                if req.streaming:
                     yield InferenceResult(
                         code="segment",
                         audio=(sample_rate, segment),
@@ -128,6 +129,8 @@ class TTSInferenceEngine(ReferenceLoader, VQManager):
                 error=None,
             )
         return None
+
+
     def send_Llama_request(
         self, req: ServeTTSRequest, prompt_tokens: list, prompt_texts: list
     ) -> queue.Queue:

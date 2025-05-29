@@ -424,7 +424,7 @@ class BaseTransformer(nn.Module):
             weights = torch.load(
                 Path(path) / "model.pth",
                 map_location="cpu",
-                weights_only=True,
+                weights_only=False,
             )
 
             if "state_dict" in weights:

@@ -424,7 +424,6 @@ class BaseTransformer(nn.Module):
             weights = torch.load(
                 Path(path) / "model.pth",
                 map_location="cpu",
-                mmap=True,
                 weights_only=True,
             )
 

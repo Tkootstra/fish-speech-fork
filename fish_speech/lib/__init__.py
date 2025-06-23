@@ -252,4 +252,4 @@ class Pipeline:
             return generator
         else:
             audio = np.concatenate(list(generator))
-            return audio
+            return audioz

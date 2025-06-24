@@ -899,6 +899,40 @@ class GenerateRequest:
     response_queue: queue.Queue
 
 
+def init_model(checkpoint_path, device, precision, compile=False):
+    model = DualARTransformer.from_pretrained(checkpoint_path, load_weights=True)
+
+    model = model.to(device=device, dtype=precision)
+    logger.info(f"Restored model from checkpoint")
+
+    if isinstance(model, DualARTransformer):
+        decode_one_token = decode_one_token_ar
+        prefill_n_tokens = decode_one_token_ar
+        logger.info("Using DualARTransformer")
+    else:
+        raise ValueError("Unsupported model type")
+
+    # Initialize cache
+    with torch.device(device):
+        model.setup_caches(
+            max_batch_size=1,
+            max_seq_len=model.config.max_seq_len,
+            dtype=next(model.parameters()).dtype,
+        )
+
+    if compile:
+        logger.info("Compiling function...")
+        decode_one_token = torch.compile(
+            decode_one_token,
+            # mode="max-autotune-no-cudagraphs",
+            backend="inductor" if torch.cuda.is_available() else "aot_eager",
+            mode="reduce-overhead" if torch.cuda.is_available() else None,
+            fullgraph=True,
+        )
+
+    return model.eval(), decode_one_token
+
+
 def launch_thread_safe_queue(
     checkpoint_path,
     device,
@@ -909,7 +943,7 @@ def launch_thread_safe_queue(
     init_event = threading.Event()
 
     def worker():
-        model, decode_one_token = load_model(
+        model, decode_one_token = init_model(
             checkpoint_path, device, precision, compile=compile
         )
         with torch.device(device):
@@ -936,6 +970,7 @@ def launch_thread_safe_queue(
                         WrappedGenerateResponse(status="success", response=chunk)
                     )
             except Exception as e:
+                logger.error(traceback.format_exc())
                 response_queue.put(WrappedGenerateResponse(status="error", response=e))
 
     threading.Thread(target=worker, daemon=True).start()

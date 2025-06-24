@@ -1,39 +1,41 @@
+import logging
 import warnings
 from queue import Queue
 from typing import Generator, List, Literal, Optional, Union
-
+from logging import Logger
 import numpy as np
 import torch
 
 from fish_speech.inference_engine import TTSInferenceEngine
 from fish_speech.models.text2semantic.inference import launch_thread_safe_queue
-from fish_speech.models.vqgan.inference import load_model as load_vqgan_model
-from fish_speech.models.vqgan.modules.firefly import FireflyArchitecture
 from fish_speech.utils.file import audio_to_bytes
 from fish_speech.utils.schema import Reference, ServeTTSRequest
+from fish_speech.models.dac.inference import load_model as load_decoder_model
+from fish_speech.models.dac.modded_dac import DAC
+
 
 Device = Literal["cuda", "mps", "cpu"]
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
-
+logger = logging.getLogger(__name__)
 
 class Pipeline:
 
     def __init__(
         self,
         llama_path: str,
-        vqgan_path: str,
-        vqgan_config: str = "firefly_gan_vq",
+        decoder_path: str,
+        decoder_config: str = "modded_dac_vq",
         device: Device = "cpu",
         half: bool = False,
-        compile: bool = False,
+        compile: bool = True,
     ) -> None:
         """
         Initialize the TTS pipeline.
         Args:
             llama_path (str): Path to the LLAMA model.
-            vqgan_path (str): Path to the VQ-GAN model.
-            vqgan_config (str, optional): VQ-GAN model configuration name. Defaults to base configuration.
+            decoder_path (str): Path to the VQ-GAN model.
+            decoder_config (str, optional): VQ-GAN model configuration name. Defaults to base configuration.
             device (Device, optional): Device to run the pipeline on. Defaults to "cpu".
             half (bool, optional): Use half precision. Defaults to False.
             compile (bool, optional): Compile the models. Defaults to False.
@@ -41,8 +43,8 @@ class Pipeline:
 
         # Validate input
         assert isinstance(llama_path, str), "llama_path must be a string."
-        assert isinstance(vqgan_path, str), "vqgan_path must be a string."
-        assert isinstance(vqgan_config, str), "vqgan_config must be a string."
+        assert isinstance(decoder_path, str), "vqgan_path must be a string."
+        assert isinstance(decoder_config, str), "vqgan_config must be a string."
         assert isinstance(half, bool), "half must be a boolean."
         assert isinstance(compile, bool), "compile must be a boolean."
 
@@ -50,11 +52,11 @@ class Pipeline:
         precision = torch.half if half else torch.bfloat16
 
         llama = self.load_llama(llama_path, device, precision, compile)
-        vqgan = self.load_vqgan(vqgan_config, vqgan_path, device)
+        decoder = self.load_decoder(decoder_config, decoder_path, device)
 
         self.inference_engine = TTSInferenceEngine(
             llama_queue=llama,
-            decoder_model=vqgan,
+            decoder_model=decoder,
             precision=precision,
             compile=compile,
         )
@@ -63,6 +65,7 @@ class Pipeline:
 
     def check_device(self, device: str) -> Device:
         """Check if the device is available."""
+
         device = device.lower()
 
         # If CUDA or MPS chosen, check if available
@@ -96,18 +99,14 @@ class Pipeline:
         except Exception as e:
             raise ValueError(f"Failed to load LLAMA model: {e}")
 
-    def load_vqgan(
-        self, vqgan_config: str, vqgan_path: str, device: str
-    ) -> FireflyArchitecture:
-        """Load the VQ-GAN model."""
-        try:
-            return load_vqgan_model(
-                config_name=vqgan_config,
-                checkpoint_path=vqgan_path,
-                device=device,
-            )
-        except Exception as e:
-            raise ValueError(f"Failed to load VQ-GAN model: {e}")
+    def load_decoder(self, config_name, checkpoint_path, device) -> DAC:
+        decoder_model = load_decoder_model(
+            config_name=config_name,
+            checkpoint_path=checkpoint_path,
+            device=device,
+        )
+        logger.info("Decoder model loaded.")
+        return decoder_model
 
     def warmup(self, inference_engine: TTSInferenceEngine) -> None:
         """Warm up the inference engine."""
@@ -147,7 +146,7 @@ class Pipeline:
     def generate_streaming(
         self,
         text: str,
-        references: Union[List[Reference], Reference] = [],
+        references: Union[List[Reference], Reference],
         seed: Optional[int] = None,
         streaming: bool = False,
         max_new_tokens: int = 0,

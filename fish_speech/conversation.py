@@ -174,7 +174,7 @@ class Conversation:
             vq_mask_labels=vq_mask_labels,
             vq_require_losses=vq_require_losses,
         )
-
+    
     def encode_for_inference(
         self: "Conversation",
         tokenizer: FishTokenizer,

@@ -171,3 +171,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+/fish_speech/Geert_speech.mp3
+/fish_speech/Cartman.wav
+/fish_speech/cce035b9-4764-40ab-b18f-d2d5cfd2e88f.pt
